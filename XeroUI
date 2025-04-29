@@ -1,0 +1,549 @@
+local UI = {
+    Windows = {},
+    Elements = {},
+    Flags = {},
+    Theme = {
+        Background = Color3.fromRGB(30, 30, 30),
+        Accent = Color3.fromRGB(0, 120, 255),
+        Text = Color3.fromRGB(255, 255, 255),
+        Border = Color3.fromRGB(50, 50, 50),
+        Hover = Color3.fromRGB(40, 40, 40),
+        Disabled = Color3.fromRGB(100, 100, 100)
+    }
+}
+
+-- Utility functions
+local function CreateInstance(className, properties)
+    local instance = Instance.new(className)
+    for property, value in pairs(properties) do
+        instance[property] = value
+    end
+    return instance
+end
+
+local function Tween(instance, properties, duration, style, direction)
+    local tweenInfo = TweenInfo.new(duration, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out)
+    local tween = game:GetService("TweenService"):Create(instance, tweenInfo, properties)
+    tween:Play()
+    return tween
+end
+
+-- Window class
+local Window = {}
+Window.__index = Window
+
+function Window.new(title)
+    local self = setmetatable({}, Window)
+    self.Title = title
+    self.Tabs = {}
+    self.Visible = true
+    self:Create()
+    return self
+end
+
+function Window:Create()
+    self.Main = CreateInstance("ScreenGui", {
+        Name = self.Title,
+        ResetOnSpawn = false
+    })
+    
+    self.Frame = CreateInstance("Frame", {
+        Parent = self.Main,
+        Size = UDim2.new(0, 500, 0, 400),
+        Position = UDim2.new(0.5, -250, 0.5, -200),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderColor3 = UI.Theme.Border
+    })
+    
+    self.TitleBar = CreateInstance("Frame", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 30),
+        BackgroundColor3 = UI.Theme.Accent,
+        BorderSizePixel = 0
+    })
+    
+    self.TitleLabel = CreateInstance("TextLabel", {
+        Parent = self.TitleBar,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = self.Title,
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14
+    })
+    
+    self.TabContainer = CreateInstance("Frame", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 30),
+        Position = UDim2.new(0, 0, 0, 30),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderSizePixel = 0
+    })
+    
+    self.Content = CreateInstance("Frame", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 1, -60),
+        Position = UDim2.new(0, 0, 0, 60),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderSizePixel = 0
+    })
+    
+    self.Main.Parent = game:GetService("CoreGui")
+end
+
+function Window:AddTab(name)
+    local tab = {
+        Name = name,
+        Elements = {},
+        Container = CreateInstance("ScrollingFrame", {
+            Parent = self.Content,
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            ScrollBarThickness = 3,
+            ScrollBarImageColor3 = UI.Theme.Accent,
+            Visible = false
+        })
+    }
+    
+    local tabButton = CreateInstance("TextButton", {
+        Parent = self.TabContainer,
+        Size = UDim2.new(0, 100, 1, 0),
+        Position = UDim2.new(0, #self.Tabs * 100, 0, 0),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderSizePixel = 0,
+        Text = name,
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14
+    })
+    
+    tabButton.MouseButton1Click:Connect(function()
+        for _, t in ipairs(self.Tabs) do
+            t.Container.Visible = false
+        end
+        tab.Container.Visible = true
+    end)
+    
+    table.insert(self.Tabs, tab)
+    if #self.Tabs == 1 then
+        tab.Container.Visible = true
+    end
+    
+    return tab
+end
+
+-- Element classes
+local Element = {}
+Element.__index = Element
+
+function Element.new(tab, name)
+    local self = setmetatable({}, Element)
+    self.Name = name
+    self.Tab = tab
+    self.Container = CreateInstance("Frame", {
+        Parent = tab.Container,
+        Size = UDim2.new(1, -20, 0, 30),
+        Position = UDim2.new(0, 10, 0, #tab.Elements * 35),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderColor3 = UI.Theme.Border
+    })
+    
+    self.Label = CreateInstance("TextLabel", {
+        Parent = self.Container,
+        Size = UDim2.new(0.5, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    table.insert(tab.Elements, self)
+    return self
+end
+
+-- Button class
+local Button = {}
+setmetatable(Button, {__index = Element})
+
+function Button.new(tab, name, callback)
+    local self = Element.new(tab, name)
+    setmetatable(self, {__index = Button})
+    
+    self.Button = CreateInstance("TextButton", {
+        Parent = self.Container,
+        Size = UDim2.new(0.4, 0, 0.8, 0),
+        Position = UDim2.new(0.55, 0, 0.1, 0),
+        BackgroundColor3 = UI.Theme.Accent,
+        BorderSizePixel = 0,
+        Text = "Button",
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14
+    })
+    
+    self.Button.MouseButton1Click:Connect(callback)
+    
+    return self
+end
+
+-- Toggle class
+local Toggle = {}
+setmetatable(Toggle, {__index = Element})
+
+function Toggle.new(tab, name, default, callback)
+    local self = Element.new(tab, name)
+    setmetatable(self, {__index = Toggle})
+    
+    self.Value = default
+    self.Callback = callback
+    
+    UI.Flags[name] = self
+    
+    self.ToggleFrame = CreateInstance("Frame", {
+        Parent = self.Container,
+        Size = UDim2.new(0.1, 0, 0.6, 0),
+        Position = UDim2.new(0.85, 0, 0.2, 0),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderColor3 = UI.Theme.Border
+    })
+    
+    self.ToggleButton = CreateInstance("Frame", {
+        Parent = self.ToggleFrame,
+        Size = UDim2.new(0.4, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = self.Value and UI.Theme.Accent or UI.Theme.Disabled,
+        BorderSizePixel = 0
+    })
+    
+    self.ToggleFrame.MouseButton1Click:Connect(function()
+        self:Set(not self.Value)
+    end)
+    
+    return self
+end
+
+function Toggle:Set(value)
+    self.Value = value
+    self.ToggleButton.BackgroundColor3 = value and UI.Theme.Accent or UI.Theme.Disabled
+    Tween(self.ToggleButton, {
+        Position = UDim2.new(value and 0.6 or 0, 0, 0, 0)
+    }, 0.2)
+    if self.Callback then
+        self.Callback(value)
+    end
+end
+
+-- Dropdown class
+local Dropdown = {}
+setmetatable(Dropdown, {__index = Element})
+
+function Dropdown.new(tab, name, options, default, multi, callback)
+    local self = Element.new(tab, name)
+    setmetatable(self, {__index = Dropdown})
+    
+    self.Options = options
+    self.Multi = multi
+    self.Callback = callback
+    self.Value = multi and {} or default
+    self.Open = false
+    
+    UI.Flags[name] = self
+    
+    self.Button = CreateInstance("TextButton", {
+        Parent = self.Container,
+        Size = UDim2.new(0.4, 0, 0.8, 0),
+        Position = UDim2.new(0.55, 0, 0.1, 0),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderColor3 = UI.Theme.Border,
+        Text = multi and "Select..." or default,
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14
+    })
+    
+    self.List = CreateInstance("Frame", {
+        Parent = self.Container,
+        Size = UDim2.new(0.4, 0, 0, 0),
+        Position = UDim2.new(0.55, 0, 1, 0),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderColor3 = UI.Theme.Border,
+        Visible = false
+    })
+    
+    self.Button.MouseButton1Click:Connect(function()
+        self:Toggle()
+    end)
+    
+    self:UpdateList()
+    
+    return self
+end
+
+function Dropdown:Toggle()
+    self.Open = not self.Open
+    self.List.Visible = self.Open
+    Tween(self.List, {
+        Size = UDim2.new(0.4, 0, 0, self.Open and #self.Options * 30 or 0)
+    }, 0.2)
+end
+
+function Dropdown:UpdateList()
+    for _, child in ipairs(self.List:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    for i, option in ipairs(self.Options) do
+        local button = CreateInstance("TextButton", {
+            Parent = self.List,
+            Size = UDim2.new(1, 0, 0, 30),
+            Position = UDim2.new(0, 0, 0, (i-1) * 30),
+            BackgroundColor3 = UI.Theme.Background,
+            BorderSizePixel = 0,
+            Text = option,
+            TextColor3 = UI.Theme.Text,
+            Font = Enum.Font.Gotham,
+            TextSize = 14
+        })
+        
+        button.MouseButton1Click:Connect(function()
+            if self.Multi then
+                if table.find(self.Value, option) then
+                    table.remove(self.Value, table.find(self.Value, option))
+                else
+                    table.insert(self.Value, option)
+                end
+                self.Button.Text = #self.Value > 0 and table.concat(self.Value, ", ") or "Select..."
+            else
+                self.Value = option
+                self.Button.Text = option
+                self:Toggle()
+            end
+            if self.Callback then
+                self.Callback(self.Value)
+            end
+        end)
+    end
+end
+
+function Dropdown:Set(value)
+    if self.Multi then
+        if type(value) == "table" then
+            self.Value = value
+        else
+            self.Value = {value}
+        end
+        self.Button.Text = #self.Value > 0 and table.concat(self.Value, ", ") or "Select..."
+    else
+        self.Value = value
+        self.Button.Text = value
+    end
+    if self.Callback then
+        self.Callback(self.Value)
+    end
+end
+
+function Dropdown:Get()
+    return self.Value
+end
+
+-- Keybind class
+local Keybind = {}
+setmetatable(Keybind, {__index = Element})
+
+function Keybind.new(tab, name, default, callback)
+    local self = Element.new(tab, name)
+    setmetatable(self, {__index = Keybind})
+    
+    self.Value = default
+    self.Callback = callback
+    self.Listening = false
+    
+    UI.Flags[name] = self
+    
+    self.Button = CreateInstance("TextButton", {
+        Parent = self.Container,
+        Size = UDim2.new(0.4, 0, 0.8, 0),
+        Position = UDim2.new(0.55, 0, 0.1, 0),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderColor3 = UI.Theme.Border,
+        Text = default,
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14
+    })
+    
+    self.Button.MouseButton1Click:Connect(function()
+        self:StartListening()
+    end)
+    
+    return self
+end
+
+function Keybind:StartListening()
+    self.Listening = true
+    self.Button.Text = "..."
+    self.Button.BackgroundColor3 = UI.Theme.Accent
+    
+    local connection
+    connection = game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            self.Value = input.KeyCode.Name
+            self.Button.Text = self.Value
+            self.Button.BackgroundColor3 = UI.Theme.Background
+            self.Listening = false
+            connection:Disconnect()
+            if self.Callback then
+                self.Callback(self.Value)
+            end
+        end
+    end)
+end
+
+function Keybind:Set(value)
+    self.Value = value
+    self.Button.Text = value
+    if self.Callback then
+        self.Callback(value)
+    end
+end
+
+function Keybind:Get()
+    return self.Value
+end
+
+-- Slider class
+local Slider = {}
+setmetatable(Slider, {__index = Element})
+
+function Slider.new(tab, name, min, max, default, callback)
+    local self = Element.new(tab, name)
+    setmetatable(self, {__index = Slider})
+    
+    self.Min = min
+    self.Max = max
+    self.Value = default
+    self.Callback = callback
+    
+    UI.Flags[name] = self
+    
+    self.SliderFrame = CreateInstance("Frame", {
+        Parent = self.Container,
+        Size = UDim2.new(0.4, 0, 0.1, 0),
+        Position = UDim2.new(0.55, 0, 0.45, 0),
+        BackgroundColor3 = UI.Theme.Background,
+        BorderColor3 = UI.Theme.Border
+    })
+    
+    self.SliderFill = CreateInstance("Frame", {
+        Parent = self.SliderFrame,
+        Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = UI.Theme.Accent,
+        BorderSizePixel = 0
+    })
+    
+    self.ValueLabel = CreateInstance("TextLabel", {
+        Parent = self.Container,
+        Size = UDim2.new(0.1, 0, 0.8, 0),
+        Position = UDim2.new(0.95, 0, 0.1, 0),
+        BackgroundTransparency = 1,
+        Text = tostring(default),
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14
+    })
+    
+    local dragging = false
+    self.SliderFrame.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mouse = game:GetService("UserInputService"):GetMouseLocation()
+            local sliderPos = self.SliderFrame.AbsolutePosition
+            local sliderSize = self.SliderFrame.AbsoluteSize
+            local percent = math.clamp((mouse.X - sliderPos.X) / sliderSize.X, 0, 1)
+            self:Set(self.Min + (self.Max - self.Min) * percent)
+        end
+    end)
+    
+    return self
+end
+
+function Slider:Set(value)
+    value = math.clamp(value, self.Min, self.Max)
+    self.Value = value
+    self.SliderFill.Size = UDim2.new((value - self.Min) / (self.Max - self.Min), 0, 1, 0)
+    self.ValueLabel.Text = tostring(math.floor(value * 100) / 100)
+    if self.Callback then
+        self.Callback(value)
+    end
+end
+
+function Slider:Get()
+    return self.Value
+end
+
+-- Label class
+local Label = {}
+setmetatable(Label, {__index = Element})
+
+function Label.new(tab, name)
+    local self = Element.new(tab, name)
+    setmetatable(self, {__index = Label})
+    return self
+end
+
+function Label:SetText(text)
+    self.Label.Text = text
+end
+
+-- Remove element function
+function Element:Remove()
+    self.Container:Destroy()
+    for i, element in ipairs(self.Tab.Elements) do
+        if element == self then
+            table.remove(self.Tab.Elements, i)
+            break
+        end
+    end
+end
+
+-- Public API
+function UI.NewWindow(title)
+    local window = Window.new(title)
+    table.insert(UI.Windows, window)
+    return window
+end
+
+function UI.GetWindow(title)
+    for _, window in ipairs(UI.Windows) do
+        if window.Title == title then
+            return window
+        end
+    end
+    return nil
+end
+
+function UI.GetFlag(name)
+    return UI.Flags[name]
+end
+
+function UI.SetFlag(name, value)
+    local flag = UI.Flags[name]
+    if flag then
+        flag:Set(value)
+    end
+end
+
+return UI
