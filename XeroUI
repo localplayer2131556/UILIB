@@ -1,14 +1,17 @@
+--test
 local UI = {
     Windows = {},
     Elements = {},
     Flags = {},
     Theme = {
-        Background = Color3.fromRGB(30, 30, 30),
+        Background = Color3.fromRGB(20, 20, 20),
         Accent = Color3.fromRGB(0, 120, 255),
         Text = Color3.fromRGB(255, 255, 255),
-        Border = Color3.fromRGB(50, 50, 50),
-        Hover = Color3.fromRGB(40, 40, 40),
-        Disabled = Color3.fromRGB(100, 100, 100)
+        Border = Color3.fromRGB(40, 40, 40),
+        Hover = Color3.fromRGB(30, 30, 30),
+        Disabled = Color3.fromRGB(100, 100, 100),
+        Selection = Color3.fromRGB(25, 25, 25),
+        SelectionHover = Color3.fromRGB(35, 35, 35)
     }
 }
 
@@ -44,20 +47,79 @@ end
 function Window:Create()
     self.Main = CreateInstance("ScreenGui", {
         Name = self.Title,
-        ResetOnSpawn = false
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     })
     
+    -- Main UI Frame
     self.Frame = CreateInstance("Frame", {
         Parent = self.Main,
-        Size = UDim2.new(0, 500, 0, 400),
-        Position = UDim2.new(0.5, -250, 0.5, -200),
+        Size = UDim2.new(0, 400, 0, 500),
+        Position = UDim2.new(0.5, -200, 0.5, -250),
         BackgroundColor3 = UI.Theme.Background,
-        BorderColor3 = UI.Theme.Border
+        BorderColor3 = UI.Theme.Border,
+        BorderSizePixel = 1,
+        ClipsDescendants = true
     })
     
+    -- Selection Panel Frame
+    self.SelectionFrame = CreateInstance("Frame", {
+        Parent = self.Main,
+        Size = UDim2.new(0, 200, 0, 500),
+        Position = UDim2.new(0.5, 210, 0.5, -250),
+        BackgroundColor3 = UI.Theme.Selection,
+        BorderColor3 = UI.Theme.Border,
+        BorderSizePixel = 1,
+        ClipsDescendants = true
+    })
+    
+    -- Make frames draggable
+    local function MakeDraggable(frame)
+        local dragging
+        local dragInput
+        local dragStart
+        local startPos
+        
+        frame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = frame.Position
+                
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+        
+        frame.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                frame.Position = newPos
+                -- Update selection panel position
+                if frame == self.Frame then
+                    self.SelectionFrame.Position = UDim2.new(0, newPos.X.Offset + 410, newPos.Y.Scale, newPos.Y.Offset)
+                end
+            end
+        end)
+    end
+    
+    MakeDraggable(self.Frame)
+    MakeDraggable(self.SelectionFrame)
+    
+    -- Title Bar
     self.TitleBar = CreateInstance("Frame", {
         Parent = self.Frame,
-        Size = UDim2.new(1, 0, 0, 30),
+        Size = UDim2.new(1, 0, 0, 40),
         BackgroundColor3 = UI.Theme.Accent,
         BorderSizePixel = 0
     })
@@ -69,23 +131,49 @@ function Window:Create()
         Text = self.Title,
         TextColor3 = UI.Theme.Text,
         Font = Enum.Font.GothamBold,
-        TextSize = 14
+        TextSize = 16
     })
     
+    -- Tab Container
     self.TabContainer = CreateInstance("Frame", {
         Parent = self.Frame,
-        Size = UDim2.new(1, 0, 0, 30),
-        Position = UDim2.new(0, 0, 0, 30),
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 0, 40),
         BackgroundColor3 = UI.Theme.Background,
         BorderSizePixel = 0
     })
     
+    -- Content Frame
     self.Content = CreateInstance("Frame", {
         Parent = self.Frame,
-        Size = UDim2.new(1, 0, 1, -60),
-        Position = UDim2.new(0, 0, 0, 60),
+        Size = UDim2.new(1, 0, 1, -80),
+        Position = UDim2.new(0, 0, 0, 80),
         BackgroundColor3 = UI.Theme.Background,
         BorderSizePixel = 0
+    })
+    
+    -- Selection Panel Content
+    self.SelectionContent = CreateInstance("ScrollingFrame", {
+        Parent = self.SelectionFrame,
+        Size = UDim2.new(1, 0, 1, -40),
+        Position = UDim2.new(0, 0, 0, 40),
+        BackgroundColor3 = UI.Theme.Selection,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = UI.Theme.Accent,
+        CanvasSize = UDim2.new(0, 0, 0, 0)
+    })
+    
+    -- Selection Panel Title
+    self.SelectionTitle = CreateInstance("TextLabel", {
+        Parent = self.SelectionFrame,
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = UI.Theme.Accent,
+        BorderSizePixel = 0,
+        Text = "Selections",
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 16
     })
     
     self.Main.Parent = game:GetService("CoreGui")
@@ -101,7 +189,8 @@ function Window:AddTab(name)
             BackgroundTransparency = 1,
             ScrollBarThickness = 3,
             ScrollBarImageColor3 = UI.Theme.Accent,
-            Visible = false
+            Visible = false,
+            CanvasSize = UDim2.new(0, 0, 0, 0)
         })
     }
     
@@ -142,10 +231,12 @@ function Element.new(tab, name)
     self.Tab = tab
     self.Container = CreateInstance("Frame", {
         Parent = tab.Container,
-        Size = UDim2.new(1, -20, 0, 30),
-        Position = UDim2.new(0, 10, 0, #tab.Elements * 35),
+        Size = UDim2.new(1, -20, 0, 40),
+        Position = UDim2.new(0, 10, 0, #tab.Elements * 45),
         BackgroundColor3 = UI.Theme.Background,
-        BorderColor3 = UI.Theme.Border
+        BorderColor3 = UI.Theme.Border,
+        BorderSizePixel = 1,
+        CornerRadius = UDim.new(0, 4)
     })
     
     self.Label = CreateInstance("TextLabel", {
@@ -203,10 +294,12 @@ function Toggle.new(tab, name, default, callback)
     
     self.ToggleFrame = CreateInstance("Frame", {
         Parent = self.Container,
-        Size = UDim2.new(0.1, 0, 0.6, 0),
-        Position = UDim2.new(0.85, 0, 0.2, 0),
+        Size = UDim2.new(0.2, 0, 0.6, 0),
+        Position = UDim2.new(0.75, 0, 0.2, 0),
         BackgroundColor3 = UI.Theme.Background,
-        BorderColor3 = UI.Theme.Border
+        BorderColor3 = UI.Theme.Border,
+        BorderSizePixel = 1,
+        CornerRadius = UDim.new(0, 10)
     })
     
     self.ToggleButton = CreateInstance("Frame", {
@@ -214,11 +307,39 @@ function Toggle.new(tab, name, default, callback)
         Size = UDim2.new(0.4, 0, 1, 0),
         Position = UDim2.new(0, 0, 0, 0),
         BackgroundColor3 = self.Value and UI.Theme.Accent or UI.Theme.Disabled,
-        BorderSizePixel = 0
+        BorderSizePixel = 0,
+        CornerRadius = UDim.new(0, 10)
     })
     
     self.ToggleFrame.MouseButton1Click:Connect(function()
         self:Set(not self.Value)
+    end)
+    
+    -- Add to selection panel
+    local selectionItem = CreateInstance("TextButton", {
+        Parent = tab.Window.SelectionContent,
+        Size = UDim2.new(1, -20, 0, 30),
+        Position = UDim2.new(0, 10, 0, #tab.Window.SelectionContent:GetChildren() * 35),
+        BackgroundColor3 = UI.Theme.Selection,
+        BorderColor3 = UI.Theme.Border,
+        BorderSizePixel = 1,
+        Text = name,
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        CornerRadius = UDim.new(0, 4)
+    })
+    
+    selectionItem.MouseButton1Click:Connect(function()
+        self:Set(not self.Value)
+    end)
+    
+    selectionItem.MouseEnter:Connect(function()
+        selectionItem.BackgroundColor3 = UI.Theme.SelectionHover
+    end)
+    
+    selectionItem.MouseLeave:Connect(function()
+        selectionItem.BackgroundColor3 = UI.Theme.Selection
     end)
     
     return self
@@ -257,10 +378,12 @@ function Dropdown.new(tab, name, options, default, multi, callback)
         Position = UDim2.new(0.55, 0, 0.1, 0),
         BackgroundColor3 = UI.Theme.Background,
         BorderColor3 = UI.Theme.Border,
+        BorderSizePixel = 1,
         Text = multi and "Select..." or default,
         TextColor3 = UI.Theme.Text,
         Font = Enum.Font.Gotham,
-        TextSize = 14
+        TextSize = 14,
+        CornerRadius = UDim.new(0, 4)
     })
     
     self.List = CreateInstance("Frame", {
@@ -269,7 +392,9 @@ function Dropdown.new(tab, name, options, default, multi, callback)
         Position = UDim2.new(0.55, 0, 1, 0),
         BackgroundColor3 = UI.Theme.Background,
         BorderColor3 = UI.Theme.Border,
-        Visible = false
+        BorderSizePixel = 1,
+        Visible = false,
+        CornerRadius = UDim.new(0, 4)
     })
     
     self.Button.MouseButton1Click:Connect(function()
@@ -277,6 +402,33 @@ function Dropdown.new(tab, name, options, default, multi, callback)
     end)
     
     self:UpdateList()
+    
+    -- Add to selection panel
+    local selectionItem = CreateInstance("TextButton", {
+        Parent = tab.Window.SelectionContent,
+        Size = UDim2.new(1, -20, 0, 30),
+        Position = UDim2.new(0, 10, 0, #tab.Window.SelectionContent:GetChildren() * 35),
+        BackgroundColor3 = UI.Theme.Selection,
+        BorderColor3 = UI.Theme.Border,
+        BorderSizePixel = 1,
+        Text = name,
+        TextColor3 = UI.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        CornerRadius = UDim.new(0, 4)
+    })
+    
+    selectionItem.MouseButton1Click:Connect(function()
+        self:Toggle()
+    end)
+    
+    selectionItem.MouseEnter:Connect(function()
+        selectionItem.BackgroundColor3 = UI.Theme.SelectionHover
+    end)
+    
+    selectionItem.MouseLeave:Connect(function()
+        selectionItem.BackgroundColor3 = UI.Theme.Selection
+    end)
     
     return self
 end
